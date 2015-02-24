@@ -25,6 +25,7 @@ from oslo_middleware import request_id as oslo_request_id
 from oslo_utils import importutils
 
 from heat.common import exception
+from heat.common.i18n import _
 from heat.common.i18n import _LE
 from heat.common import policy
 from heat.common import wsgi
@@ -183,6 +184,17 @@ class RequestContext(context.RequestContext):
         if self.auth_token_info:
             auth_ref = access.AccessInfo.factory(body=self.auth_token_info,
                                                  auth_token=self.auth_token)
+
+            if 'catalog' not in auth_ref and 'serviceCatalog' not in auth_ref:
+                kc = self.clients.client('keystone').client
+
+                if kc.version == 'v3':
+                    auth_ref['catalog'] = kc.service_catalog.get_data()
+                elif kc.version == 'v2.0':
+                    auth_ref['serviceCatalog'] = kc.service_catalog.get_data()
+                else:
+                    raise exception.Error(_("Unknown Keystone version"))
+
             return _AccessInfoPlugin(self._keystone_v3_endpoint, auth_ref)
 
         if self.auth_token:

@@ -108,6 +108,53 @@ class TestRequestContext(common.HeatTestCase):
             ctx = context.RequestContext(roles=['notadmin'])
             self.assertFalse(ctx.is_admin)
 
+    @mock.patch('keystoneclient.access.AccessInfo.factory')
+    def test_dont_get_service_catalog_if_exists_v2(self, fake_ai):
+        ctx = context.RequestContext.from_dict(self.ctx)
+        fake_auth_ref = {'token_id': 'foobar', 'serviceCatalog': 'orig'}
+        fake_ai.return_value = fake_auth_ref
+        self.assertEqual(ctx.auth_plugin.auth_ref, fake_auth_ref)
+
+    @mock.patch('keystoneclient.access.AccessInfo.factory')
+    def test_dont_get_service_catalog_if_exists_v3(self, fake_ai):
+        ctx = context.RequestContext.from_dict(self.ctx)
+        fake_auth_ref = {'token_id': 'foobar', 'catalog': 'orig'}
+        fake_ai.return_value = fake_auth_ref
+        self.assertEqual(ctx.auth_plugin.auth_ref, fake_auth_ref)
+
+    @mock.patch('keystoneclient.access.AccessInfo.factory')
+    @mock.patch('heat.engine.clients.OpenStackClients.client')
+    def test_retrieve_missing_service_catalog_v2(self, fake_osc, fake_ai):
+        ctx = context.RequestContext.from_dict(self.ctx)
+        fake_ai.return_value = {'token_id': 'foobar'}
+        osc_mock = mock.MagicMock()
+        osc_mock.client.version = 'v2.0'
+        osc_mock.client.service_catalog.get_data.return_value = 'newserv'
+        fake_osc.return_value = osc_mock
+        self.assertEqual(ctx.auth_plugin.auth_ref['serviceCatalog'], 'newserv')
+
+    @mock.patch('keystoneclient.access.AccessInfo.factory')
+    @mock.patch('heat.engine.clients.OpenStackClients.client')
+    def test_retrieve_missing_service_catalog_v3(self, fake_osc, fake_ai):
+        ctx = context.RequestContext.from_dict(self.ctx)
+        fake_ai.return_value = {'token_id': 'foobar'}
+        osc_mock = mock.MagicMock()
+        osc_mock.client.version = 'v3'
+        osc_mock.client.service_catalog.get_data.return_value = 'newserv'
+        fake_osc.return_value = osc_mock
+        self.assertEqual(ctx.auth_plugin.auth_ref['catalog'], 'newserv')
+
+    @mock.patch('keystoneclient.access.AccessInfo.factory')
+    @mock.patch('heat.engine.clients.OpenStackClients.client')
+    def test_retrieve_missing_service_catalog_unknown(self, fake_osc, fake_ai):
+        ctx = context.RequestContext.from_dict(self.ctx)
+        fake_ai.return_value = {'token_id': 'foobar'}
+        osc_mock = mock.MagicMock()
+        osc_mock.client.version = 'badversion'
+        osc_mock.client.service_catalog.get_data.return_value = 'newserv'
+        fake_osc.return_value = osc_mock
+        self.assertRaises(exception.Error, lambda: ctx.auth_plugin)
+
 
 class RequestContextMiddlewareTest(common.HeatTestCase):
 
