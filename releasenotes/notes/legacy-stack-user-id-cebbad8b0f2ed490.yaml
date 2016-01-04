@@ -1,0 +1,4 @@
+---
+upgrade:
+  - The Heat stack user from pre-Icehouse stacks which use software config may
+    require manual cleanup after deletion of the stack.
